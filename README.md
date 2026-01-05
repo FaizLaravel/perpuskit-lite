@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PerpusKit Lite — Library Management Starter Kit
 
 **Versi Gratis untuk Preview & Demo**
@@ -386,3 +387,6 @@ Dibangun dengan:
 > Untuk fitur lengkap tanpa limitasi, [upgrade ke PerpusKit Full](https://your-landing-page.com) sekarang!
 > 
 > **Happy Coding!** 🚀
+=======
+# perpuskit-lite
+>>>>>>> 57b5d73a77dfdc53b210583c84d43780d997b540
