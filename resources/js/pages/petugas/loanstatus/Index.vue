@@ -1,0 +1,324 @@
+<script setup lang="ts">
+import DataTable from '@/components/DataTable.vue';
+import Pagination from '@/components/tables/Pagination.vue';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import FlashMessage from '@/components/ui/flash/FlashMessage.vue';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { index, show } from '@/routes/statuspeminjamans';
+import {
+    BreadcrumbItem,
+    PaginatedResponse,
+    PengajuanPeminjaman,
+} from '@/types';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { watchDebounced } from '@vueuse/core';
+import { Eye } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    {
+        title: 'Status Peminjaman',
+        href: index().url,
+    },
+];
+const props = defineProps<{
+    LoanStatus: PaginatedResponse<PengajuanPeminjaman>;
+}>();
+console.log(props.LoanStatus);
+const pagination = computed(() => ({
+    previous: props.LoanStatus.prev_page_url,
+    next: props.LoanStatus.next_page_url,
+}));
+const pageProps = computed(() => {
+    return (
+        (usePage().props.filters as {
+            search?: string;
+            sortColumn?: string;
+            order?: 'asc' | 'desc';
+            status?: string;
+            searchBy?: string;
+            perPage?: string;
+        }) || {}
+    );
+});
+const searchQuery = ref(pageProps.value.search ?? '');
+const searchBy = ref(pageProps.value.searchBy ?? '');
+const selectedSort = ref(pageProps.value.sortColumn ?? 'created_at');
+const sortOrder = ref<'asc' | 'desc'>(pageProps.value.order ?? 'asc');
+const statusSearch = ref(pageProps.value.status ?? '');
+const perPage = ref(pageProps.value.perPage ?? '7');
+const updatestatuspeminjamans = () => {
+    router.get(
+        '/statuspeminjamans',
+        {
+            search: searchQuery.value,
+            sortColumn: selectedSort.value,
+            order: sortOrder.value,
+            column: searchBy.value,
+            status: statusSearch.value,
+            searchBy: searchBy.value,
+            perPage: perPage.value,
+        },
+        { preserveState: true },
+    );
+};
+function toggleSort(key: string) {
+    if (selectedSort.value === key) {
+        sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        selectedSort.value = key;
+        sortOrder.value = 'asc';
+    }
+    updatestatuspeminjamans();
+}
+watchDebounced(
+    [searchQuery, statusSearch, perPage, searchBy],
+    (newQuery, oldQuery) => {
+        if (newQuery !== oldQuery) {
+            updatestatuspeminjamans();
+        }
+    },
+    { debounce: 500 },
+);
+const resetFilters = () => {
+    searchQuery.value = '';
+    searchBy.value = '';
+    statusSearch.value = '';
+    perPage.value = '7';
+
+    updatestatuspeminjamans();
+};
+const columns = [
+    { key: 'no', label: 'No' },
+    { key: 'kode_transaksi', label: 'Kode Transaksi', sortable: true },
+    { key: 'user_id', label: 'Nama Anggota', sortable: true },
+    { key: 'book_id', label: 'Judul Buku', sortable: true },
+    // { key: 'jatuh_tempo', label: 'Jatuh Tempo', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    // { key: 'denda', label: 'Denda', sortable: true },
+    { key: 'actions', label: 'Aksi' },
+];
+
+function hitungTerlambat(tanggalJatuhTempo: string | Date): string {
+    const jatuhTempo = new Date(tanggalJatuhTempo);
+    const today = new Date();
+
+    // Samakan jam ke 00:00:00
+    jatuhTempo.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const selisihMs = jatuhTempo.getTime() - today.getTime();
+    const selisihHari = Math.floor(selisihMs / 86400000);
+
+    // Jika belum lewat jatuh tempo
+    // if (selisihHari <= 0) {
+    //     return '0 hari';
+    // }
+
+    return `${selisihHari} hari`;
+}
+const popoverOpen = ref(false);
+</script>
+<template>
+    <!-- <Head title="Peminjaman Buku" /> -->
+    <AppLayout :breadcrumbs="breadcrumbs">
+        <div class="mx-auto mt-5 max-w-6xl overflow-x-auto">
+            <FlashMessage />
+            <Card class="border-transparent">
+                <CardContent>
+                    <div
+                        class="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
+                    >
+                        <div class="flex items-end gap-2">
+                            <Input
+                                id="searchQuery"
+                                class="w-full sm:w-64"
+                                v-model="searchQuery"
+                                placeholder="Cari..."
+                            />
+                            <select
+                                id="perPage"
+                                v-model="searchBy"
+                                @change="updatestatuspeminjamans"
+                                class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none sm:w-40"
+                            >
+                                <option value="">- Semua Kolom -</option>
+                                <option value="kode_transaksi">
+                                    Kode Transaksi
+                                </option>
+                                <option value="user_id">Nama Anggota</option>
+
+                                <option value="book_id">Judul Buku</option>
+                            </select>
+                        </div>
+                        <TooltipProvider>
+                            <Tooltip v-if="!popoverOpen">
+                                <Popover>
+                                    <TooltipTrigger as-child>
+                                        <PopoverTrigger
+                                            ><Button
+                                                variant="outline"
+                                                class="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                                            >
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    width="18"
+                                                    height="18"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    class="lucide lucide-funnel"
+                                                >
+                                                    <path
+                                                        d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"
+                                                    />
+                                                </svg> </Button
+                                        ></PopoverTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <span>Filter Data</span>
+                                    </TooltipContent>
+                                    <PopoverContent
+                                        ><div class="flex flex-col">
+                                            <Label
+                                                for="statusSearch"
+                                                class="mb-2"
+                                                >Status</Label
+                                            >
+                                            <select
+                                                id="statusSearch"
+                                                v-model="statusSearch"
+                                                class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                                            >
+                                                <option value="">
+                                                    -- Semua Status --
+                                                </option>
+                                                <option value="dipinjam">
+                                                    Dipinjam
+                                                </option>
+                                                <option value="terlambat">
+                                                    Terlambat
+                                                </option>
+                                                <option value="hilang">
+                                                    Hilang
+                                                </option>
+                                                <option value="dikembalikan">
+                                                    Dikembalikan
+                                                </option>
+                                                <option value="pending">
+                                                    Pending
+                                                </option>
+                                                <option value="rusak">
+                                                    Rusak
+                                                </option>
+                                            </select>
+                                            <Label
+                                                for="perPage"
+                                                class="mt-3 mb-2"
+                                                >Jumlah Data</Label
+                                            >
+                                            <select
+                                                id="perPage"
+                                                v-model="perPage"
+                                                class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                                            >
+                                                <option value="7">
+                                                    -- Jumlah Standar --
+                                                </option>
+                                                <option value="5">5</option>
+                                                <option value="10">10</option>
+                                                <option value="20">20</option>
+                                                <option value="50">50</option>
+                                            </select>
+                                            <div class="mt-2 flex flex-col">
+                                                <Button
+                                                    type="button"
+                                                    class="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                                                    @click="resetFilters"
+                                                >
+                                                    Reset Filter
+                                                </Button>
+                                            </div>
+                                        </div></PopoverContent
+                                    >
+                                </Popover>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                    <DataTable
+                        :columns="columns"
+                        :data="LoanStatus.data"
+                        :links="LoanStatus.links"
+                        :current_page="props.LoanStatus.current_page"
+                        :per_page="props.LoanStatus.per_page"
+                        :filters="{
+                            search: searchQuery,
+                            sortColumn: selectedSort,
+                            sortOrder: sortOrder,
+                        }"
+                        @toggleSort="toggleSort"
+                    >
+                        <template #no="{ i, current_page, per_page }">
+                            {{ (current_page - 1) * per_page + i + 1 }}
+                        </template>
+                        <template #user_id="{ item }">
+                            {{ item.user?.name || 'Tidak Ada' }}
+                        </template>
+                        <template #book_id="{ item }">
+                            {{ item.book?.judul || 'Tidak Ada' }}
+                        </template>
+                        <template #jatuh_tempo="{ item }">
+                            <span v-if="item.status === 'pending'"> - </span>
+                            <span v-else>
+                                {{ hitungTerlambat(item.tanggal_jatuh_tempo) }}
+                            </span>
+                        </template>
+                        <template #actions="{ item: statuspeminjamans }">
+                            <div class="flex items-center gap-2">
+                                <div class="group relative inline-block">
+                                    <!-- Show -->
+                                    <Link
+                                        :href="show(statuspeminjamans.id)"
+                                        as="button"
+                                    >
+                                        <Button variant="outline" size="icon">
+                                            <Eye class="h-4 w-4" />
+                                        </Button>
+                                    </Link>
+
+                                    <span
+                                        class="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded bg-black px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 transition group-hover:opacity-100"
+                                    >
+                                        Lihat
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+                    </DataTable>
+                </CardContent>
+            </Card>
+        </div>
+        <Pagination
+            :previousPage="pagination.previous"
+            :nextPage="pagination.next"
+            :links="props.LoanStatus.links"
+        />
+    </AppLayout>
+</template>
