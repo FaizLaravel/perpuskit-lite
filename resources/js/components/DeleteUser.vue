@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProfileController from '@/actions/Settings/Settings/ProfileController';
+import ProfileController from '@/actions/settings/general/ProfileController';
 import { Form } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
