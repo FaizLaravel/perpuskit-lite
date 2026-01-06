@@ -46,7 +46,6 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: create().url,
     },
 ];
-
 const form = useForm({
     judul: '',
     penulis: '',
@@ -57,9 +56,7 @@ const form = useForm({
     jumlah_halaman: '',
     deskripsi: '',
 });
-
 const categories = ref<Category[]>([]);
-
 onMounted(async () => {
     try {
         const response = await axios.get('/api/categories');
